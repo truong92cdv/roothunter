@@ -1,14 +1,11 @@
 #include <stdio.h>
-#include <string.h>
-
-void func(char *input) {
-	char buffer[256];
-	strcpy(buffer, input);
-}
 
 int main(int argc, char *argv[]) {
-	if (argc > 1) {
-		func(argv[1]);
+	int secret;
+	char name[100];
+	printf("Enter your name: ");
+	gets(name);
+	if (secret == 0x746f6f72) {
+		printf("You win!\n");
 	}
 }
-
