@@ -1,23 +1,55 @@
-# Bai 1: Buffer Overflow co ban
+# 0x01: Simple Buffer Overflow
 
-Muc tieu bai nay: hieu duoc tran bo dem tren stack, xem vi tri bien bang `pwndbg`, va tao payload de ghi de bien `secret`.
+Buffer Overflow (tràn bộ đệm - BOF) là một lỗi bảo mật xảy ra khi chương trình ghi nhiều dữ liệu hơn kích thước vùng nhớ (buffer) được cấp phát. Khi đó, dữ liệu sẽ ghi đè lên các vùng nhớ lân cận như biến khác, con trỏ hàm, hoặc địa chỉ trả về trên stack — từ đó có thể làm chương trình crash hoặc bị chiếm quyền điều khiển.
 
-## 1) Source loi
+Lỗi này đặc biệt phổ biến trong các chương trình viết bằng C/C++ do không có cơ chế kiểm tra biên tự động như các ngôn ngữ cấp cao (Python, Java…).
 
-```c
-int secret;
-char name[100];
-gets(name);
-if (secret == 0x746f6f72) {
-    printf("You win!\\n");
+Trong C/C++, buffer overflow (BOF) thường xảy ra do sử dụng các hàm không kiểm tra kích thước bộ đệm hoặc kiểm tra không đầy đủ. Dưới đây là các hàm nguy hiểm phổ biến gây ra BOF:
+
+- gets(): Đọc input cho đến khi gặp newline. Không kiểm tra kích thước buffer.
+- scanf("%s", buf): %s đọc chuỗi không giới hạn độ dài. Nếu không ghi rõ kích thước → tràn.
+- strcpy(dest, src): Sao chép đến khi gặp \0. Không kiểm tra kích thước dest.
+- read(fd, buf, size): Nếu size > kích thước buf → BOF.
+
+BOF thuong duoc chia thanh 2 loai: stack-based BOF va heap-based BOF dua tren vi tri bo nho bi loi. Bai lab hom nay, chung ta se tim hieu ve cach khai thac loi nay theo dang co ban nhat.
+
+
+## 1) Vulnerable source
+
+```c target.c
+#include <stdio.h>
+
+int main(int argc, char *argv[]) {
+	int secret;
+	char name[100];
+	printf("Enter your name: ");
+	gets(name);
+	if (secret == 0x746f6f72) {
+		printf("You win!\n");
+	}
 }
 ```
 
-- `gets(name)` doc input khong gioi han do dai.
-- `name` chi co 100 byte, neu nhap dai hon thi du lieu se tran sang cac vung ben canh tren stack.
-- Muc tieu la ghi de `secret` thanh `0x746f6f72`.
+Tien hanh build 2 file binary voi kien truc 32 bit va 64 bit. De don gian, khi build ta tat het cac tinh nang bao mat nang cao nhu NX, ASLR, PIE, CANARY
 
-`0x746f6f72` theo byte little-endian la: `72 6f 6f 74` => chuoi `root`.
+```bash
+gcc -fno-stack-protector -z execstack -D_FORTIFY_SOURCE=0 -no-pie -m32 target.c -o target_m32
+gcc -fno-stack-protector -z execstack -D_FORTIFY_SOURCE=0 -no-pie -m64 target.c -o target_m64
+echo 0 > /proc/sys/kernel/randomize_va_space
+
+```
+
+Chay thu chuong trinh:
+```bash
+→  0x01 ./target_m32
+Enter your name: drx
+→  0x01 
+```
+
+Chuong trinh cho nguoi dung nhap ten, luu vao bien **name**. Sau do kiem tra neu bien **secret** bi thay doi thanh gia tri **0x746f6f72** thi in ra dong chu thong bao *You win!*.
+O day, bien **name** chi duoc khai bao co do dai 100 ky tu, nhung ham **gets(name)** lai khong kiem tra do dai chuoi do nguoi dung nhap vao, gay nen loi BOF. Ta se tim cach khai thac loi nay de sua doi bien **secret** thanh gia tri **0x746f6f72**.
+
+
 
 ## 2) Hinh dung stack frame
 
